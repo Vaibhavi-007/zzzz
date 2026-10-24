@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Negotiation Task</title>
+<style>
+  body { font-family: sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; }
+  .screen { display: none; }
+  .active { display: block; }
+  #bar { height: 28px; background: #eee; border: 1px solid #888; position: relative; margin: 16px 0; }
+  #fill { height: 100%; background: #4a90d9; width: 0%; }
+  #marker { position: absolute; top: -8px; left: 0%; width: 3px; height: 44px; background: #d00; }
+  #bot { background: #f5f5f5; padding: 12px; min-height: 48px; margin: 12px 0; }
+  button { padding: 8px 14px; margin: 4px; }
+  input[type=number] { padding: 6px; width: 80px; }
+</style>
+</head>
+<body>
+
+<!-- ============ CONFIG (edit here only) ============ -->
+<script>
+const CONFIG = {
+  CONDITIONS: ["pleasant", "neutral", "unpleasant"],
+  STIMULI: {                      // replace with your validated clip paths
+    pleasant:   "clips/pleasant.mp4",
+    neutral:    "clips/neutral.mp4",
+    unpleasant: "clips/unpleasant.mp4"
+  },
+  POOL: 100,          // points split per round
+  TARGET: 500,        // total points goal
+  ROUNDS: 10,         // negotiation rounds per participant
+  OPEN_OFFER: 30,     // bot's opening offer to participant (same in all conditions)
+  BOT_LIMIT: 60,      // bot's hidden reservation value (same in all conditions)
+  STEP: 5,            // bot's concession per participant counter
+  MAX_COUNTERS: 4,    // after this many rejected demands, bot's offer is final
+  ROUND_TIMEOUT_S: 120
+};
+</script>
+
+<!-- ============ SCREENS ============ -->
+<div id="s-start" class="screen active">
+  <h2>Study</h2>
+  <p>Please enter your participant ID, then press Start.</p>
+  <input id="pid" type="text">
+  <button onclick="startStudy()">Start</button>
+</div>
+
+<div id="s-stim" class="screen">
+  <video id="clip" width="640" controls onended="showSAM()"></video>
+  <p><button onclick="showSAM()">Continue</button></p>
+</div>
+
+<div id="s-sam" class="screen">
+  <h3>How do you feel right now?</h3>
+  <p>Valence (1 = very unpleasant, 9 = very pleasant)</p>
+  <div id="valence"></div>
+  <p>Arousal (1 = very calm, 9 = very excited)</p>
+  <div id="arousal"></div>
+  <p><button onclick="submitSAM()">Submit</button></p>
+</div>
+
+<div id="s-game" class="screen">
+  <div>Round <span id="roundNum"></span> of <span id="roundTotal"></span> &nbsp;|&nbsp; Time left: <span id="timer"></span>s</div>
+  <div id="bar"><div id="fill"></div><div id="marker"></div></div>
+  <div>Points: <span id="pts">0</span> / <span id="tgt"></span></div>
+  <div id="bot"></div>
+  <div id="controls">
+    <button id="btnAccept" onclick="participantAccept()">Accept offer</button>
+    <input id="demand" type="number" min="0" max="100" placeholder="Your demand">
+    <button id="btnDemand" onclick="participantDemand()">Send demand</button>
+  </div>
+</div>
+
+<div id="s-end" class="screen">
+  <h2>Done</h2>
+  <p>Total points: <span id="finalPts"></span></p>
+  <p>Target reached: <span id="finalHit"></span></p>
+  <button onclick="downloadCSV()">Download data</button>
+</div>
+
+<script>
+// ============ STATE ============
+let S = {
+  pid: "", cond: "", rows: [],
+  round: 0, total: 0,
+  offer: 0, counters: 0, finalOffer: false,
+  roundStartMs: 0, roundStartPerf: 0, offerShownPerf: 0,
+  timerId: null, timeLeft: 0, negStartMs: 0, negStartPerf: 0
+};
+
+// ============ LOGGING ============
+function log(event, value = "", extra = "") {
+  const now = performance.now();
+  S.rows.push({
+    pid: S.pid, condition: S.cond, round: S.round, event: event,
+    value: value, extra: extra,
+    wall_ms: Date.now(),
+    t_since_neg_start_ms: S.negStartPerf ? Math.round(now - S.negStartPerf) : "",
+    rt_since_offer_ms: S.offerShownPerf ? Math.round(now - S.offerShownPerf) : ""
+  });
+}
+
+function show(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+
+// ============ CONDITION ASSIGNMENT (random, once per participant) ============
+function assignCondition() {
+  const c = CONFIG.CONDITIONS;
+  return c[Math.floor(Math.random() * c.length)];
+}
+
+// Sanity check: is the target reachable with negotiation at the bot's limit?
+if (CONFIG.ROUNDS * CONFIG.BOT_LIMIT < CONFIG.TARGET) {
+  console.warn("TARGET is unreachable: ROUNDS * BOT_LIMIT < TARGET");
+}
+
+// ============ FLOW ============
+function startStudy() {
+  S.pid = document.getElementById("pid").value.trim();
+  if (!S.pid) { alert("Enter a participant ID."); return; }
+  S.cond = assignCondition();
+  log("condition_assigned", S.cond);
+  const clip = document.getElementById("clip");
+  clip.src = CONFIG.STIMULI[S.cond];
+  log("stimulus_start", S.cond);
+  show("s-stim");
+}
+
+function buildSlider(containerId, name) {
+  const div = document.getElementById(containerId);
+  div.innerHTML = "";
+  for (let i = 1; i <= 9; i++) {
+    const label = document.createElement("label");
+    label.style.marginRight = "10px";
+    label.innerHTML = `<input type="radio" name="${name}" value="${i}"> ${i}`;
+    div.appendChild(label);
+  }
+}
+
+let samShown = false;
+function showSAM() {
+  if (samShown) return;
+  samShown = true;
+  document.getElementById("clip").pause();
+  log("stimulus_end");
+  buildSlider("valence", "valence");
+  buildSlider("arousal", "arousal");
+  log("sam_shown");
+  show("s-sam");
+}
+
+function submitSAM() {
+  const v = document.querySelector("input[name=valence]:checked");
+  const a = document.querySelector("input[name=arousal]:checked");
+  if (!v || !a) { alert("Answer both scales."); return; }
+  log("sam_valence", v.value);
+  log("sam_arousal", a.value);
+  // Rating is recorded as a manipulation check only. The bot never reads it.
+  startGame();
+}
+
+function startGame() {
+  S.round = 0; S.total = 0;
+  document.getElementById("roundTotal").textContent = CONFIG.ROUNDS;
+  document.getElementById("tgt").textContent = CONFIG.TARGET;
+  updateBar();
+  show("s-game");
+  nextRound();
+}
+
+function nextRound() {
+  S.round++;
+  if (S.round > CONFIG.ROUNDS) { endStudy(); return; }
+  document.getElementById("roundNum").textContent = S.round;
+  S.offer = CONFIG.OPEN_OFFER;
+  S.counters = 0;
+  S.finalOffer = false;
+  S.negStartMs = Date.now();
+  S.negStartPerf = performance.now();
+  S.offerShownPerf = performance.now();
+  S.timeLeft = CONFIG.ROUND_TIMEOUT_S;
+  document.getElementById("demand").value = "";
+  setControlsEnabled(true);
+  botSay(`My offer: you get ${S.offer} of ${CONFIG.POOL} points. Accept, or send your demand.`);
+  log("bot_offer", S.offer);
+  startTimer();
+}
+
+function botSay(msg) {
+  document.getElementById("bot").textContent = msg;
+}
+
+function setControlsEnabled(on) {
+  document.getElementById("btnAccept").disabled = !on;
+  document.getElementById("btnDemand").disabled = !on;
+  document.getElementById("demand").disabled = !on;
+}
+
+function startTimer() {
+  clearInterval(S.timerId);
+  const el = document.getElementById("timer");
+  el.textContent = S.timeLeft;
+  S.timerId = setInterval(() => {
+    S.timeLeft--;
+    el.textContent = S.timeLeft;
+    if (S.timeLeft <= 0) {
+      clearInterval(S.timerId);
+      log("timeout");
+      finishRound(0, "timeout");
+    }
+  }, 1000);
+}
+
+// ============ PARTICIPANT ACTIONS ============
+function participantAccept() {
+  log("participant_accept", S.offer);
+  finishRound(S.offer, "accept");
+}
+
+function participantDemand() {
+  const raw = document.getElementById("demand").value;
+  const d = parseInt(raw, 10);
+  if (isNaN(d) || d < 0 || d > CONFIG.POOL) {
+    alert(`Enter a number from 0 to ${CONFIG.POOL}.`);
+    return;
+  }
+  log("participant_demand", d);
+
+  // Bot accepts any demand within its limit
+  if (d <= CONFIG.BOT_LIMIT) {
+    log("bot_accepts_demand", d);
+    finishRound(d, "demand_accepted");
+    return;
+  }
+
+  // Bot rejects. Concede a step unless the final offer has been reached.
+  S.counters++;
+  if (S.counters >= CONFIG.MAX_COUNTERS) {
+    S.finalOffer = true;
+    S.offer = CONFIG.BOT_LIMIT;
+    botSay(`This is my final offer: you get ${S.offer} points. Accept or walk away.`);
+    document.getElementById("btnDemand").disabled = true;
+    document.getElementById("demand").disabled = true;
+    log("bot_final_offer", S.offer);
+  } else {
+    S.offer = Math.min(CONFIG.BOT_LIMIT, S.offer + CONFIG.STEP);
+    botSay(`I can do better: you get ${S.offer} points. Accept, or send your demand.`);
+    log("bot_counter_offer", S.offer);
+  }
+  S.offerShownPerf = performance.now();
+  document.getElementById("demand").value = "";
+}
+
+// ============ ROUND END ============
+function finishRound(points, outcome) {
+  clearInterval(S.timerId);
+  setControlsEnabled(false);
+  const negRT = Math.round(performance.now() - S.negStartPerf);
+  S.total += points;
+  S.rows.push({
+    pid: S.pid, condition: S.cond, round: S.round, event: "round_end",
+    value: points, extra: outcome,
+    wall_ms: Date.now(),
+    t_since_neg_start_ms: negRT,
+    rt_since_offer_ms: ""
+  });
+  updateBar();
+  botSay(outcome === "timeout" ? "Time is up. No deal this round."
+       : points === 0 ? "No deal this round."
+       : `Deal: you get ${points} points.`);
+  setTimeout(nextRound, 1500);
+}
+
+function updateBar() {
+  document.getElementById("pts").textContent = S.total;
+  const pct = Math.min(100, (S.total / CONFIG.TARGET) * 100);
+  document.getElementById("fill").style.width = pct + "%";
+  document.getElementById("marker").style.left = pct + "%";
+}
+
+// ============ END ============
+function endStudy() {
+  clearInterval(S.timerId);
+  log("game_end", S.total);
+  document.getElementById("finalPts").textContent = S.total;
+  document.getElementById("finalHit").textContent = S.total >= CONFIG.TARGET ? "Yes" : "No";
+  show("s-end");
+}
+
+function downloadCSV() {
+  const cols = ["pid","condition","round","event","value","extra","wall_ms","t_since_neg_start_ms","rt_since_offer_ms"];
+  const lines = [cols.join(",")].concat(
+    S.rows.map(r => cols.map(c => `"${String(r[c] ?? "").replace(/"/g, '""')}"`).join(","))
+  );
+  const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${S.pid}_negotiation.csv`;
+  a.click();
+}
+</script>
+</body>
+</html>

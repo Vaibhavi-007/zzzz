@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: emotion-negotiation-app
+    restart: unless-stopped
+    ports:
+      - "5050:5050"
+    environment:
+      - PORT=5050
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://mongo:27017/emotion_negotiation
+    depends_on:
+      - mongo
+
+  mongo:
+    image: mongo:7.0
+    container_name: emotion-negotiation-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+volumes:
+  mongo_data:
