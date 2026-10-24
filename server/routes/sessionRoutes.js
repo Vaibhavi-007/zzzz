@@ -107,9 +107,11 @@ router.post('/:id/rate-mood', async (req, res) => {
       botConfig: {
         difficulty: botConfig.difficulty,
         openOffer: botConfig.openOffer,
+        botReservationLimit: botConfig.botReservationLimit,
+        concessionStep: botConfig.concessionStep,
         pool: botConfig.pool,
         maxCounters: botConfig.maxCounters,
-        initialDialogue: botConfig.botPhrases.open
+        initialDialogue: botConfig.initialDialogue
       }
     });
   } catch (err) {
@@ -122,7 +124,14 @@ router.post('/:id/rate-mood', async (req, res) => {
 router.post('/:id/counter', async (req, res) => {
   try {
     const { id } = req.params;
-    const { demand, currentBotOffer, counterCount = 0, latencyMs = 0 } = req.body;
+    const {
+      demand,
+      currentBotOffer,
+      counterCount = 0,
+      latencyMs = 0,
+      activeReservationLimit,
+      activeConcessionStep
+    } = req.body;
 
     let session;
     if (getStatus()) {
@@ -135,7 +144,14 @@ router.post('/:id/counter', async (req, res) => {
 
     // Bot negotiation logic is conditioned on reported mood!
     const mood = session.reportedMood || session.condition || 'neutral';
-    const result = evaluateCounterDemand(mood, demand, currentBotOffer, counterCount);
+    const result = evaluateCounterDemand(
+      mood,
+      demand,
+      currentBotOffer,
+      counterCount,
+      activeReservationLimit,
+      activeConcessionStep
+    );
 
     res.json({
       success: true,
@@ -230,13 +246,24 @@ router.post('/:id/round', async (req, res) => {
       fallback.save('sessions', session);
     }
 
+    const nextBotConfig = getBotConfig(mood);
+
     res.json({
       success: true,
       trial: trialData,
       metrics,
       currentTotalPoints: newTotalPoints,
       targetPoints: session.targetPoints,
-      targetReached
+      targetReached,
+      nextRoundBotConfig: {
+        difficulty: nextBotConfig.difficulty,
+        openOffer: nextBotConfig.openOffer,
+        botReservationLimit: nextBotConfig.botReservationLimit,
+        concessionStep: nextBotConfig.concessionStep,
+        pool: nextBotConfig.pool,
+        maxCounters: nextBotConfig.maxCounters,
+        initialDialogue: nextBotConfig.initialDialogue
+      }
     });
   } catch (err) {
     console.error('Record round error:', err);

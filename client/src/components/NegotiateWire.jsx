@@ -47,11 +47,21 @@ export default function NegotiateWire({
   // Sync state if round resets or initial botConfig loads
   useEffect(() => {
     if (botConfig) {
-      setBotOffer(botConfig.openOffer);
-      setParticipantDemand(Math.min(botConfig.pool, botConfig.openOffer + 25));
+      // Determine condition-appropriate randomized opening offer for the round
+      let roundOpenOffer = botConfig.openOffer;
+      if (roundNumber > 1 && !botConfig._freshRandom) {
+        // Apply slight per-round natural jitter (-3 to +3) within valid bounds
+        const jitter = Math.floor(Math.random() * 7) - 3;
+        roundOpenOffer = Math.max(14, Math.min(60, (botConfig.openOffer || 32) + jitter));
+      }
+
+      setBotOffer(roundOpenOffer);
+      setParticipantDemand(Math.min(pool, roundOpenOffer + 24 + Math.floor(Math.random() * 5)));
       setCounterCount(0);
       setIsFinalOffer(false);
-      setBotDialogue(botConfig.initialDialogue);
+      setBotDialogue(
+        `My opening offer this round is ${roundOpenOffer} points for you. Accept, or propose your counter-demand on the wire.`
+      );
       setTimeLeft(90);
       roundStartTimeRef.current = Date.now();
       offerShownTimeRef.current = performance.now();
@@ -128,7 +138,9 @@ export default function NegotiateWire({
         demand: participantDemand,
         currentBotOffer: botOffer,
         counterCount: counterCount,
-        latencyMs: actionLatency
+        latencyMs: actionLatency,
+        activeReservationLimit: botConfig?.botReservationLimit,
+        activeConcessionStep: botConfig?.concessionStep
       });
 
       if (response?.error) {

@@ -79,12 +79,21 @@ export default function App() {
   };
 
   // 4. Participant sends counter-demand on the Negotiate Wire
-  const handleSendDemand = async ({ demand, currentBotOffer, counterCount, latencyMs }) => {
+  const handleSendDemand = async ({
+    demand,
+    currentBotOffer,
+    counterCount,
+    latencyMs,
+    activeReservationLimit,
+    activeConcessionStep
+  }) => {
     return await api.sendCounter(session.sessionId, {
       demand,
       currentBotOffer,
       counterCount,
-      latencyMs
+      latencyMs,
+      activeReservationLimit,
+      activeConcessionStep
     });
   };
 
@@ -104,6 +113,9 @@ export default function App() {
         setSession(finalRes.session);
         setStage('summary');
       } else {
+        if (res.nextRoundBotConfig) {
+          setBotConfig({ ...res.nextRoundBotConfig, _freshRandom: true });
+        }
         // Advance to next negotiation round
         setCurrentRound((r) => r + 1);
       }
