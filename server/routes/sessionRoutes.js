@@ -12,42 +12,28 @@ const {
 } = require('../controllers/negotiationEngine');
 const { STIMULI_DATA } = require('../controllers/stimuliData');
 
-// 1. Start a new session
+// 1. Start a new session (Directly enters negotiation game)
 router.post('/start', async (req, res) => {
   try {
-    const { participantId, condition, stimulusType, targetPoints = 500 } = req.body;
+    const { participantId, targetPoints = 500 } = req.body;
     if (!participantId) {
       return res.status(400).json({ error: 'participantId is required' });
     }
 
-    const assignedCondition = condition || ['pleasant', 'neutral', 'unpleasant'][Math.floor(Math.random() * 3)];
-    const chosenType = stimulusType || 'video';
-
-    // Select stimulus
-    const candidates = STIMULI_DATA.filter(s => s.category === assignedCondition && s.type === chosenType);
-    const stimulus = candidates.length > 0
-      ? candidates[Math.floor(Math.random() * candidates.length)]
-      : STIMULI_DATA.find(s => s.category === assignedCondition) || STIMULI_DATA[0];
-
+    const initialBotConfig = getBotConfig();
     const sessionId = `SES-${Date.now()}-${uuidv4().substring(0, 6)}`;
     const sessionData = {
       sessionId,
       participantId: participantId.trim(),
-      condition: assignedCondition,
-      stimulusType: chosenType,
-      stimulusId: stimulus.id,
       targetPoints: Number(targetPoints) || 500,
       totalPointsWon: 0,
       targetReached: false,
-      reportedMood: 'pending',
-      likertValenceScore: null,
-      moodRatingLatencyMs: 0,
       totalRoundsPlayed: 0,
       totalNegotiationDurationMs: 0,
       averageRoundDurationMs: 0,
       averageAccuracyRatio: 0,
       averageDealSpeed: 0,
-      status: 'stimulus_active',
+      status: 'negotiation_active',
       startedAt: new Date()
     };
 
@@ -60,7 +46,7 @@ router.post('/start', async (req, res) => {
     res.json({
       success: true,
       session: sessionData,
-      stimulus
+      botConfig: initialBotConfig
     });
   } catch (err) {
     console.error('Session start error:', err);
@@ -142,10 +128,7 @@ router.post('/:id/counter', async (req, res) => {
 
     if (!session) return res.status(404).json({ error: 'Session not found' });
 
-    // Bot negotiation logic is conditioned on reported mood!
-    const mood = session.reportedMood || session.condition || 'neutral';
     const result = evaluateCounterDemand(
-      mood,
       demand,
       currentBotOffer,
       counterCount,
@@ -155,7 +138,6 @@ router.post('/:id/counter', async (req, res) => {
 
     res.json({
       success: true,
-      moodCondition: mood,
       ...result
     });
   } catch (err) {
@@ -187,8 +169,7 @@ router.post('/:id/round', async (req, res) => {
 
     if (!session) return res.status(404).json({ error: 'Session not found' });
 
-    const mood = session.reportedMood || session.condition || 'neutral';
-    const botConfig = getBotConfig(mood);
+    const botConfig = getBotConfig();
     const isDeal = finalOutcome === 'participant_accepted' || finalOutcome === 'bot_accepted_demand';
     const pointsWon = isDeal ? Number(agreedPoints) : 0;
 
@@ -208,9 +189,9 @@ router.post('/:id/round', async (req, res) => {
       sessionId: session.sessionId,
       participantId: session.participantId,
       roundNumber: Number(roundNumber),
-      condition: session.condition,
-      reportedMood: mood,
-      botDifficulty: botConfig.difficulty,
+      condition: 'standard',
+      reportedMood: 'standard',
+      botDifficulty: 'standard',
       poolSize: botConfig.pool,
       botOpeningOffer: botConfig.openOffer,
       botReservationLimit: botConfig.botReservationLimit,
@@ -246,7 +227,7 @@ router.post('/:id/round', async (req, res) => {
       fallback.save('sessions', session);
     }
 
-    const nextBotConfig = getBotConfig(mood);
+    const nextBotConfig = getBotConfig();
 
     res.json({
       success: true,
@@ -256,7 +237,7 @@ router.post('/:id/round', async (req, res) => {
       targetPoints: session.targetPoints,
       targetReached,
       nextRoundBotConfig: {
-        difficulty: nextBotConfig.difficulty,
+        difficulty: 'standard',
         openOffer: nextBotConfig.openOffer,
         botReservationLimit: nextBotConfig.botReservationLimit,
         concessionStep: nextBotConfig.concessionStep,

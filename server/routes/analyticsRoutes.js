@@ -21,68 +21,67 @@ async function getAllSessions() {
   return fallback.find('sessions');
 }
 
-// 1. Experimental Summary Metrics grouped by Mood Condition
+// 1. Experimental Summary Metrics
 router.get('/summary', async (req, res) => {
   try {
     const trials = await getAllTrials();
     const sessions = await getAllSessions();
 
-    const conditions = ['pleasant', 'neutral', 'unpleasant'];
-    const summaryByCondition = {};
+    const countTrials = trials.length;
+    const countSessions = sessions.length;
 
-    conditions.forEach(cond => {
-      const condTrials = trials.filter(t => (t.reportedMood || t.condition || '').toLowerCase().includes(cond));
-      const condSessions = sessions.filter(s => (s.reportedMood || s.condition || '').toLowerCase().includes(cond));
+    const avgRunTimeMs = countTrials > 0
+      ? Math.round(trials.reduce((sum, t) => sum + (t.roundDurationMs || 0), 0) / countTrials)
+      : 0;
 
-      const countTrials = condTrials.length;
-      const countSessions = condSessions.length;
+    const avgAccuracy = countTrials > 0
+      ? Number((trials.reduce((sum, t) => sum + (t.accuracyRatio || 0), 0) / countTrials).toFixed(3))
+      : 0;
 
-      const avgRunTimeMs = countTrials > 0
-        ? Math.round(condTrials.reduce((sum, t) => sum + (t.roundDurationMs || 0), 0) / countTrials)
-        : 0;
+    const avgDealSpeed = countTrials > 0
+      ? Number((trials.reduce((sum, t) => sum + (t.dealSpeedPointsPerSec || 0), 0) / countTrials).toFixed(2))
+      : 0;
 
-      const avgAccuracy = countTrials > 0
-        ? Number((condTrials.reduce((sum, t) => sum + (t.accuracyRatio || 0), 0) / countTrials).toFixed(3))
-        : 0;
+    const avgAgreedPoints = countTrials > 0
+      ? Math.round(trials.reduce((sum, t) => sum + (t.agreedPoints || 0), 0) / countTrials)
+      : 0;
 
-      const avgDealSpeed = countTrials > 0
-        ? Number((condTrials.reduce((sum, t) => sum + (t.dealSpeedPointsPerSec || 0), 0) / countTrials).toFixed(2))
-        : 0;
+    const avgCounters = countTrials > 0
+      ? Number((trials.reduce((sum, t) => sum + (t.countersExchanged || 0), 0) / countTrials).toFixed(1))
+      : 0;
 
-      const avgAgreedPoints = countTrials > 0
-        ? Math.round(condTrials.reduce((sum, t) => sum + (t.agreedPoints || 0), 0) / countTrials)
-        : 0;
+    const targetReachedCount = sessions.filter(s => s.targetReached).length;
+    const targetReachedRate = countSessions > 0
+      ? Math.round((targetReachedCount / countSessions) * 100)
+      : 0;
 
-      const avgCounters = countTrials > 0
-        ? Number((condTrials.reduce((sum, t) => sum + (t.countersExchanged || 0), 0) / countTrials).toFixed(1))
-        : 0;
+    // Count rejections across trials
+    const rejectionsCount = trials.reduce((sum, t) => {
+      const rejectedExchanges = (t.exchanges || []).filter(e => e.action === 'bot_rejected').length;
+      return sum + rejectedExchanges;
+    }, 0);
 
-      const targetReachedCount = condSessions.filter(s => s.targetReached).length;
-      const targetReachedRate = countSessions > 0
-        ? Math.round((targetReachedCount / countSessions) * 100)
-        : 0;
-
-      summaryByCondition[cond] = {
-        condition: cond,
-        participantCount: countSessions,
-        totalTrials: countTrials,
-        avgRunTimeMs,
-        avgRunTimeSec: Number((avgRunTimeMs / 1000).toFixed(2)),
-        avgAccuracyRatio: avgAccuracy,
-        avgAccuracyPercent: Math.round(avgAccuracy * 100),
-        avgDealSpeedPointsPerSec: avgDealSpeed,
-        avgAgreedPoints,
-        avgCountersExchanged: avgCounters,
-        targetReachedCount,
-        targetReachedRate
-      };
-    });
+    const overall = {
+      participantCount: countSessions,
+      totalTrials: countTrials,
+      avgRunTimeMs,
+      avgRunTimeSec: Number((avgRunTimeMs / 1000).toFixed(2)),
+      avgAccuracyRatio: avgAccuracy,
+      avgAccuracyPercent: Math.round(avgAccuracy * 100),
+      avgDealSpeedPointsPerSec: avgDealSpeed,
+      avgAgreedPoints,
+      avgCountersExchanged: avgCounters,
+      rejectionsCount,
+      targetReachedCount,
+      targetReachedRate
+    };
 
     res.json({
       success: true,
-      totalSessionsCount: sessions.length,
-      totalTrialsCount: trials.length,
-      conditions: summaryByCondition
+      totalSessionsCount: countSessions,
+      totalTrialsCount: countTrials,
+      overall,
+      recentTrials: trials.slice(-15).reverse()
     });
   } catch (err) {
     console.error('Analytics summary error:', err);
@@ -99,9 +98,6 @@ router.get('/export/csv', async (req, res) => {
       'session_id',
       'participant_id',
       'round_number',
-      'condition',
-      'reported_mood',
-      'bot_difficulty',
       'final_outcome',
       'agreed_points',
       'bot_opening_offer',
@@ -127,9 +123,6 @@ router.get('/export/csv', async (req, res) => {
       escapeCsv(t.sessionId),
       escapeCsv(t.participantId),
       t.roundNumber,
-      escapeCsv(t.condition),
-      escapeCsv(t.reportedMood),
-      escapeCsv(t.botDifficulty),
       escapeCsv(t.finalOutcome),
       t.agreedPoints,
       t.botOpeningOffer,
@@ -160,15 +153,10 @@ router.get('/export/csv', async (req, res) => {
 router.post('/seed-demo', async (req, res) => {
   try {
     const demoSessions = [
-      // Pleasant condition cohort (Fast negotiations, high points, easy compromises)
-      { pid: 'PILOT-P01', mood: 'pleasant', condition: 'pleasant', rounds: 8, baseDuration: 9400, basePoints: 68, accuracy: 0.91 },
-      { pid: 'PILOT-P02', mood: 'pleasant', condition: 'pleasant', rounds: 7, baseDuration: 8200, basePoints: 72, accuracy: 0.96 },
-      // Neutral condition cohort (Moderate durations and points)
-      { pid: 'PILOT-N01', mood: 'neutral', condition: 'neutral', rounds: 10, baseDuration: 18200, basePoints: 52, accuracy: 0.86 },
-      { pid: 'PILOT-N02', mood: 'neutral', condition: 'neutral', rounds: 10, baseDuration: 16500, basePoints: 50, accuracy: 0.83 },
-      // Unpleasant condition cohort (Slow negotiations, tough low offers, stubborn bot)
-      { pid: 'PILOT-U01', mood: 'unpleasant', condition: 'unpleasant', rounds: 12, baseDuration: 28500, basePoints: 34, accuracy: 0.81 },
-      { pid: 'PILOT-U02', mood: 'unpleasant', condition: 'unpleasant', rounds: 12, baseDuration: 31200, basePoints: 32, accuracy: 0.76 }
+      { pid: 'PILOT-01', rounds: 8, baseDuration: 11400, basePoints: 65, accuracy: 0.88 },
+      { pid: 'PILOT-02', rounds: 7, baseDuration: 9800, basePoints: 72, accuracy: 0.94 },
+      { pid: 'PILOT-03', rounds: 9, baseDuration: 14200, basePoints: 58, accuracy: 0.85 },
+      { pid: 'PILOT-04', rounds: 10, baseDuration: 16500, basePoints: 50, accuracy: 0.82 }
     ];
 
     for (const d of demoSessions) {
@@ -180,24 +168,24 @@ router.post('/seed-demo', async (req, res) => {
         const pts = Math.min(100, Math.max(20, Math.round(d.basePoints + (Math.random() * 8 - 4))));
         const dur = Math.max(3000, Math.round(d.baseDuration + (Math.random() * 3000 - 1500)));
         const latency = Math.round(1200 + Math.random() * 800);
-        const counters = d.mood === 'pleasant' ? 1 : d.mood === 'neutral' ? 2 : 3;
+        const counters = Math.floor(Math.random() * 3) + 1;
         totalPts += pts;
         totalDur += dur;
 
-        const botResLimit = d.mood === 'pleasant' ? 75 : d.mood === 'neutral' ? 60 : 42;
+        const botResLimit = 65;
         const accuracy = Number((pts / botResLimit).toFixed(3));
 
         const trial = {
           sessionId,
           participantId: d.pid,
           roundNumber: r,
-          condition: d.condition,
-          reportedMood: d.mood,
-          botDifficulty: d.mood === 'pleasant' ? 'easy' : d.mood === 'neutral' ? 'moderate' : 'hard',
+          condition: 'standard',
+          reportedMood: 'standard',
+          botDifficulty: 'standard',
           poolSize: 100,
-          botOpeningOffer: d.mood === 'pleasant' ? 48 : d.mood === 'neutral' ? 32 : 18,
+          botOpeningOffer: 32 + (Math.floor(Math.random() * 7) - 3),
           botReservationLimit: botResLimit,
-          botConcessionStep: d.mood === 'pleasant' ? 8 : d.mood === 'neutral' ? 5 : 3,
+          botConcessionStep: 5,
           finalOutcome: 'participant_accepted',
           agreedPoints: pts,
           roundDurationMs: dur,
@@ -219,15 +207,9 @@ router.post('/seed-demo', async (req, res) => {
       const sessionDoc = {
         sessionId,
         participantId: d.pid,
-        condition: d.condition,
-        stimulusType: 'video',
-        stimulusId: `${d.condition}-vid-01`,
         targetPoints: 500,
         totalPointsWon: totalPts,
         targetReached: totalPts >= 500,
-        reportedMood: d.mood,
-        likertValenceScore: d.mood === 'pleasant' ? 7 : d.mood === 'unpleasant' ? 2 : 4,
-        moodRatingLatencyMs: 2450,
         totalRoundsPlayed: d.rounds,
         totalNegotiationDurationMs: totalDur,
         averageRoundDurationMs: Math.round(totalDur / d.rounds),

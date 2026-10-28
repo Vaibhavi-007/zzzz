@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
-import { Target, Play, Shield, SlidersHorizontal, Info, Sparkles } from 'lucide-react';
+import { Target, Play, Shield, SlidersHorizontal, Info } from 'lucide-react';
 
 export default function Onboarding({ onStartStudy, isStarting = false }) {
   const [pid, setPid] = useState(`PARTICIPANT-${Math.floor(100 + Math.random() * 900)}`);
-  const [condition, setCondition] = useState('random'); // 'random' | 'pleasant' | 'neutral' | 'unpleasant'
-  const [stimulusType, setStimulusType] = useState('video'); // 'video' | 'photo'
   const [targetPoints, setTargetPoints] = useState(500);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -14,8 +12,6 @@ export default function Onboarding({ onStartStudy, isStarting = false }) {
 
     onStartStudy({
       participantId: pid.trim(),
-      condition: condition === 'random' ? undefined : condition,
-      stimulusType,
       targetPoints: Number(targetPoints) || 500
     });
   };
@@ -26,13 +22,13 @@ export default function Onboarding({ onStartStudy, isStarting = false }) {
       <div className="border-b border-slate-100 pb-6 mb-6">
         <div className="inline-flex items-center gap-2 text-xs font-mono font-medium px-2.5 py-1 rounded bg-slate-100 text-slate-700 mb-3">
           <Shield className="w-3.5 h-3.5" />
-          Protocol ID: EXP-EMO-NEG-2026
+          Protocol ID: EXP-NEG-2026
         </div>
         <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
-          Experimental Negotiation Study
+          Behavioral Negotiation Study
         </h2>
         <p className="text-sm text-slate-600 mt-2 leading-relaxed">
-          In this session, you will view standardized emotion-evoking stimulus material, report your feelings on a Likert scale, and then engage in an interactive negotiation game on a bargaining wire to attain a cumulative target of <strong>500 points</strong>.
+          In this experiment, you will play an interactive negotiation game on a bargaining wire against an automated bot. Your objective is to negotiate points across rounds to reach a cumulative target of <strong>{targetPoints} points</strong>.
         </p>
       </div>
 
@@ -40,20 +36,20 @@ export default function Onboarding({ onStartStudy, isStarting = false }) {
       <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-5 mb-6 text-xs text-slate-700 space-y-2.5">
         <div className="font-semibold text-slate-900 flex items-center gap-1.5 text-sm">
           <Info className="w-4 h-4 text-slate-600" />
-          Instructions & Sequence:
+          Game Rules & Dynamics:
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
           <div className="bg-white p-3 rounded-lg border border-slate-200">
-            <span className="font-bold text-slate-900 block mb-1">1. Stimulus Phase</span>
-            Watch a standardized photo or video clip carefully.
+            <span className="font-bold text-slate-900 block mb-1">1. The Negotiate Wire</span>
+            Each round splits 100 points. The bot marks its offer; you position your demand.
           </div>
           <div className="bg-white p-3 rounded-lg border border-slate-200">
-            <span className="font-bold text-slate-900 block mb-1">2. Likert Rating</span>
-            Rate your mood from Pleasant, Neutral, to Unpleasant.
+            <span className="font-bold text-rose-700 block mb-1">2. Bot Rejection Rule</span>
+            The bot rejects any demand that is <strong>10+ points</strong> or <strong>15%+ higher</strong> than the previous offer.
           </div>
           <div className="bg-white p-3 rounded-lg border border-slate-200">
-            <span className="font-bold text-slate-900 block mb-1">3. The Negotiate Wire</span>
-            Bargain for points across rounds to reach 500 points!
+            <span className="font-bold text-emerald-700 block mb-1">3. Target Goal</span>
+            Strike deals to accumulate <strong>{targetPoints} points</strong> across rounds as fast and accurately as possible.
           </div>
         </div>
       </div>
@@ -74,7 +70,7 @@ export default function Onboarding({ onStartStudy, isStarting = false }) {
           />
         </div>
 
-        {/* Researcher Config Toggle */}
+        {/* Experimenter Settings Toggle */}
         <div>
           <button
             type="button"
@@ -82,57 +78,27 @@ export default function Onboarding({ onStartStudy, isStarting = false }) {
             className="flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors"
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
-            <span>{showAdvanced ? 'Hide Experimental Parameters' : 'Configure Experimental Parameters (Researcher Override)'}</span>
+            <span>{showAdvanced ? 'Hide Experiment Target Settings' : 'Configure Experiment Target Settings'}</span>
           </button>
 
           {showAdvanced && (
             <div className="mt-3 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Condition Assignment:
-                  </label>
-                  <select
-                    value={condition}
-                    onChange={(e) => setCondition(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded-md border border-slate-300 bg-white text-xs font-medium"
-                  >
-                    <option value="random">Randomized Condition (Double-Blind)</option>
-                    <option value="pleasant">Pleasant (Easy Negotiation Bot)</option>
-                    <option value="neutral">Neutral (Moderate Negotiation Bot)</option>
-                    <option value="unpleasant">Unpleasant (Hard Negotiation Bot)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Stimulus Material Type:
-                  </label>
-                  <select
-                    value={stimulusType}
-                    onChange={(e) => setStimulusType(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded-md border border-slate-300 bg-white text-xs font-medium"
-                  >
-                    <option value="video">Standardized Video Clip</option>
-                    <option value="photo">Standardized Photographic Image</option>
-                  </select>
-                </div>
-              </div>
-
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Target Point Accumulator:
+                  Master Target Point Accumulator:
                 </label>
-                <input
-                  type="number"
-                  min="100"
-                  max="2000"
-                  step="50"
-                  value={targetPoints}
-                  onChange={(e) => setTargetPoints(Number(e.target.value))}
-                  className="w-32 px-3 py-1.5 rounded-md border border-slate-300 bg-white text-xs font-mono"
-                />
-                <span className="ml-2 text-slate-500">points</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="100"
+                    max="2000"
+                    step="50"
+                    value={targetPoints}
+                    onChange={(e) => setTargetPoints(Number(e.target.value))}
+                    className="w-32 px-3 py-1.5 rounded-md border border-slate-300 bg-white text-xs font-mono"
+                  />
+                  <span className="text-slate-500">points</span>
+                </div>
               </div>
             </div>
           )}
@@ -146,7 +112,7 @@ export default function Onboarding({ onStartStudy, isStarting = false }) {
             className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white font-semibold text-sm shadow-xs active:translate-y-0.5 transition-all"
           >
             <Play className="w-4 h-4 fill-current" />
-            <span>{isStarting ? 'Initializing Trial...' : 'Begin Experimental Protocol'}</span>
+            <span>{isStarting ? 'Initializing Trial...' : 'Start Negotiation Task'}</span>
           </button>
         </div>
       </form>

@@ -9,13 +9,13 @@ import {
   Zap,
   Shield,
   MessageSquare,
-  Bot
+  Bot,
+  XCircle
 } from 'lucide-react';
 
 export default function NegotiateWire({
   roundNumber = 1,
   totalRounds = 10,
-  reportedMood = 'neutral',
   botConfig,
   currentRoundPoints = 0,
   onAcceptOffer,
@@ -28,7 +28,7 @@ export default function NegotiateWire({
 
   const [botOffer, setBotOffer] = useState(initialBotOffer);
   const [participantDemand, setParticipantDemand] = useState(
-    Math.min(pool, initialBotOffer + 25)
+    Math.min(pool, initialBotOffer + 4)
   );
   const [counterCount, setCounterCount] = useState(0);
   const [botDialogue, setBotDialogue] = useState(
@@ -37,6 +37,7 @@ export default function NegotiateWire({
   const [isFinalOffer, setIsFinalOffer] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dealAnimation, setDealAnimation] = useState(false);
+  const [rejectionAlert, setRejectionAlert] = useState(null);
 
   // Reaction time & round time
   const [timeLeft, setTimeLeft] = useState(90);
@@ -47,18 +48,18 @@ export default function NegotiateWire({
   // Sync state if round resets or initial botConfig loads
   useEffect(() => {
     if (botConfig) {
-      // Determine condition-appropriate randomized opening offer for the round
       let roundOpenOffer = botConfig.openOffer;
       if (roundNumber > 1 && !botConfig._freshRandom) {
-        // Apply slight per-round natural jitter (-3 to +3) within valid bounds
         const jitter = Math.floor(Math.random() * 7) - 3;
-        roundOpenOffer = Math.max(14, Math.min(60, (botConfig.openOffer || 32) + jitter));
+        roundOpenOffer = Math.max(16, Math.min(60, (botConfig.openOffer || 32) + jitter));
       }
 
       setBotOffer(roundOpenOffer);
-      setParticipantDemand(Math.min(pool, roundOpenOffer + 24 + Math.floor(Math.random() * 5)));
+      // Initialize participant demand comfortably close (+4 points) to avoid immediate accidental rejection
+      setParticipantDemand(Math.min(pool, roundOpenOffer + 4));
       setCounterCount(0);
       setIsFinalOffer(false);
+      setRejectionAlert(null);
       setBotDialogue(
         `My opening offer this round is ${roundOpenOffer} points for you. Accept, or propose your counter-demand on the wire.`
       );
@@ -151,6 +152,22 @@ export default function NegotiateWire({
 
       setCounterCount(response.counterCount);
 
+      // Handle Rejection by Bot
+      if (response.isRejected) {
+        setRejectionAlert({
+          reason: response.rejectionReason,
+          diff: response.diff,
+          pctDiff: response.pctDiff
+        });
+        setBotDialogue(response.dialogue);
+        setIsFinalOffer(response.isFinal);
+        offerShownTimeRef.current = performance.now();
+        setIsSubmitting(false);
+        return;
+      }
+
+      setRejectionAlert(null);
+
       if (response.isDeal) {
         // Demand accepted by bot!
         setDealAnimation(true);
@@ -185,30 +202,33 @@ export default function NegotiateWire({
     }
   };
 
+  const handleDemandChange = (val) => {
+    setParticipantDemand(val);
+    if (rejectionAlert) setRejectionAlert(null);
+  };
+
   // Positions on the 0-100 wire
   const botOfferPct = (botOffer / pool) * 100;
   const participantDemandPct = (participantDemand / pool) * 100;
   const spreadStart = Math.min(botOfferPct, participantDemandPct);
   const spreadWidth = Math.abs(participantDemandPct - botOfferPct);
 
-  // Mood badge styling
-  const moodStyle =
-    reportedMood === 'pleasant'
-      ? { label: 'Easy (Cooperative Bot)', color: 'text-emerald-700 bg-emerald-50 border-emerald-200' }
-      : reportedMood === 'unpleasant'
-      ? { label: 'Hard (Stubborn Bot)', color: 'text-rose-700 bg-rose-50 border-rose-200' }
-      : { label: 'Moderate (Balanced Bot)', color: 'text-amber-700 bg-amber-50 border-amber-200' };
+  // Max non-reject threshold
+  const maxAllowedDemand = Math.min(
+    pool,
+    Math.min(botOffer + 9, Math.floor(botOffer * 1.149))
+  );
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs">
       {/* Round & Timer Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100">
         <div className="flex items-center gap-3">
-          <div className="text-xs font-semibold px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 border border-slate-200 font-mono-num">
+          <div className="text-xs font-semibold px-2.5 py-1 rounded-md bg-slate-900 text-white font-mono-num shadow-xs">
             Round {roundNumber} of {totalRounds}
           </div>
-          <div className={`text-xs font-medium px-2.5 py-1 rounded-md border ${moodStyle.color}`}>
-            Dynamic Difficulty: <span className="font-semibold">{moodStyle.label}</span>
+          <div className="text-xs font-mono text-slate-500 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-md">
+            Pool: {pool} pts
           </div>
         </div>
 
@@ -226,7 +246,7 @@ export default function NegotiateWire({
       </div>
 
       {/* Bot Persona Dialogue Window */}
-      <div className="mt-5 mb-7 bg-slate-50 border border-slate-200/80 rounded-lg p-4 flex items-start gap-3">
+      <div className="mt-5 mb-5 bg-slate-50 border border-slate-200/80 rounded-lg p-4 flex items-start gap-3">
         <div className="w-8 h-8 rounded-md bg-slate-800 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
           <Bot className="w-4 h-4" />
         </div>
@@ -244,6 +264,29 @@ export default function NegotiateWire({
           </div>
         )}
       </div>
+
+      {/* Rejection Alert Banner (When Bot Rejects the Person's Offer) */}
+      {rejectionAlert && (
+        <div className="mb-6 p-4 bg-rose-50 border border-rose-300 rounded-xl flex items-start gap-3 text-xs text-rose-900 shadow-xs">
+          <div className="w-5 h-5 rounded-full bg-rose-200 text-rose-700 flex items-center justify-center shrink-0 mt-0.5 font-bold">
+            <XCircle className="w-4 h-4 text-rose-600" />
+          </div>
+          <div className="flex-1">
+            <div className="font-bold text-rose-950 flex items-center gap-2">
+              <span>Offer Rejected by Bot</span>
+              <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-rose-200 text-rose-800 font-semibold">
+                Rejection Rule Triggered
+              </span>
+            </div>
+            <p className="mt-1 text-rose-800 leading-relaxed">
+              Your demand of <strong>{participantDemand} points</strong> {rejectionAlert.reason}.
+            </p>
+            <div className="mt-2 text-[11px] text-rose-700 font-medium bg-rose-100/70 p-2 rounded border border-rose-200">
+              💡 <strong>Bot Rejection Rule:</strong> The bot rejects counter-offers that are <strong>10+ points higher</strong> OR <strong>15%+ higher</strong> than the previous offer ({botOffer} pts). Maximum allowable counter: <strong>≤ {maxAllowedDemand} points</strong>.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ================= THE NEGOTIATE WIRE ================= */}
       <div className="my-8 px-2">
@@ -270,6 +313,8 @@ export default function NegotiateWire({
               className={`absolute top-0 bottom-0 transition-all duration-300 ${
                 dealAnimation
                   ? 'bg-emerald-500 animate-wire-pulse'
+                  : rejectionAlert
+                  ? 'bg-rose-400 opacity-80'
                   : 'bg-gradient-to-r from-blue-400 via-indigo-400 to-sky-400 opacity-80'
               }`}
               style={{
@@ -312,11 +357,19 @@ export default function NegotiateWire({
             style={{ left: `${participantDemandPct}%` }}
           >
             {/* Bottom Indicator Badge */}
-            <div className="absolute -bottom-10 px-2 py-0.5 rounded bg-blue-600 text-white text-[11px] font-mono-num font-semibold shadow-xs whitespace-nowrap">
+            <div className={`absolute -bottom-10 px-2 py-0.5 rounded text-white text-[11px] font-mono-num font-semibold shadow-xs whitespace-nowrap ${
+              participantDemand >= botOffer + 10 || (botOffer > 0 && participantDemand >= botOffer * 1.15)
+                ? 'bg-rose-600'
+                : 'bg-blue-600'
+            }`}>
               Demand: {participantDemand} pts
             </div>
             {/* Grip Node */}
-            <div className="w-7 h-7 rounded-full bg-blue-600 border-2 border-white shadow-md flex items-center justify-center cursor-grab active:cursor-grabbing hover:scale-110 transition-transform">
+            <div className={`w-7 h-7 rounded-full border-2 border-white shadow-md flex items-center justify-center cursor-grab active:cursor-grabbing hover:scale-110 transition-transform ${
+              participantDemand >= botOffer + 10 || (botOffer > 0 && participantDemand >= botOffer * 1.15)
+                ? 'bg-rose-600'
+                : 'bg-blue-600'
+            }`}>
               <div className="w-2 h-2 rounded-full bg-white"></div>
             </div>
           </div>
@@ -328,7 +381,7 @@ export default function NegotiateWire({
             max={pool}
             value={participantDemand}
             disabled={disabled || isFinalOffer || isSubmitting}
-            onChange={(e) => setParticipantDemand(Number(e.target.value))}
+            onChange={(e) => handleDemandChange(Number(e.target.value))}
             className="absolute inset-0 w-full opacity-0 cursor-pointer z-40 h-full"
             aria-label="Negotiate Wire Participant Demand Slider"
           />
@@ -359,7 +412,7 @@ export default function NegotiateWire({
           <button
             type="button"
             disabled={disabled || isFinalOffer || participantDemand <= 0}
-            onClick={() => setParticipantDemand((p) => Math.max(0, p - 5))}
+            onClick={() => handleDemandChange(Math.max(0, participantDemand - 5))}
             className="px-2.5 py-1 text-xs font-mono-num font-medium rounded border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40"
           >
             -5
@@ -367,7 +420,7 @@ export default function NegotiateWire({
           <button
             type="button"
             disabled={disabled || isFinalOffer || participantDemand <= 0}
-            onClick={() => setParticipantDemand((p) => Math.max(0, p - 1))}
+            onClick={() => handleDemandChange(Math.max(0, participantDemand - 1))}
             className="px-2.5 py-1 text-xs font-mono-num font-medium rounded border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40"
           >
             -1
@@ -378,13 +431,13 @@ export default function NegotiateWire({
             max={pool}
             value={participantDemand}
             disabled={disabled || isFinalOffer}
-            onChange={(e) => setParticipantDemand(Math.min(pool, Math.max(0, Number(e.target.value))))}
+            onChange={(e) => handleDemandChange(Math.min(pool, Math.max(0, Number(e.target.value))))}
             className="w-16 px-2 py-1 text-center font-mono-num text-xs font-semibold rounded border border-slate-300 bg-white"
           />
           <button
             type="button"
             disabled={disabled || isFinalOffer || participantDemand >= pool}
-            onClick={() => setParticipantDemand((p) => Math.min(pool, p + 1))}
+            onClick={() => handleDemandChange(Math.min(pool, participantDemand + 1))}
             className="px-2.5 py-1 text-xs font-mono-num font-medium rounded border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40"
           >
             +1
@@ -392,7 +445,7 @@ export default function NegotiateWire({
           <button
             type="button"
             disabled={disabled || isFinalOffer || participantDemand >= pool}
-            onClick={() => setParticipantDemand((p) => Math.min(pool, p + 5))}
+            onClick={() => handleDemandChange(Math.min(pool, participantDemand + 5))}
             className="px-2.5 py-1 text-xs font-mono-num font-medium rounded border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40"
           >
             +5
@@ -406,9 +459,13 @@ export default function NegotiateWire({
             type="button"
             disabled={disabled || isFinalOffer || isSubmitting}
             onClick={handleProposeDemand}
-            className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 shadow-xs active:translate-y-0.5 transition-all disabled:opacity-40"
+            className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg border shadow-xs active:translate-y-0.5 transition-all disabled:opacity-40 ${
+              participantDemand >= botOffer + 10 || (botOffer > 0 && participantDemand >= botOffer * 1.15)
+                ? 'border-rose-300 bg-rose-50 text-rose-800 hover:bg-rose-100'
+                : 'border-slate-300 bg-white hover:bg-slate-50 text-slate-700'
+            }`}
           >
-            <Send className="w-3.5 h-3.5 text-slate-500" />
+            <Send className="w-3.5 h-3.5" />
             <span>Propose Demand ({participantDemand} pts)</span>
           </button>
 

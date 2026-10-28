@@ -81,7 +81,7 @@ export default function DebriefSummary({
           </div>
         </div>
         <span className="text-xs font-mono px-3 py-1 rounded bg-white border border-current font-semibold">
-          {session?.reportedMood ? `Mood: ${session.reportedMood.toUpperCase()}` : ''}
+          {targetReached ? 'TARGET REACHED' : 'TARGET NOT REACHED'}
         </span>
       </div>
 

@@ -10,7 +10,9 @@ import {
   Zap,
   TrendingUp,
   FileSpreadsheet,
-  CheckCircle2
+  CheckCircle2,
+  XCircle,
+  AlertTriangle
 } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -18,7 +20,6 @@ export default function ResearcherDashboard() {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'comparison'
 
   const fetchAnalytics = async () => {
     try {
@@ -52,10 +53,8 @@ export default function ResearcherDashboard() {
     window.open(api.getExportCsvUrl(), '_blank');
   };
 
-  const conditions = summary?.conditions || {};
-  const pleasant = conditions.pleasant || {};
-  const neutral = conditions.neutral || {};
-  const unpleasant = conditions.unpleasant || {};
+  const overall = summary?.overall || {};
+  const recentTrials = summary?.recentTrials || [];
 
   return (
     <div className="space-y-6">
@@ -64,13 +63,13 @@ export default function ResearcherDashboard() {
         <div>
           <div className="inline-flex items-center gap-2 text-xs font-mono font-medium px-2.5 py-0.5 rounded bg-slate-100 text-slate-700 mb-2">
             <Database className="w-3.5 h-3.5" />
-            Empirical Telemetry & Comparative Analytics
+            Empirical Telemetry & Analytics Portal
           </div>
           <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-            Affective Negotiation Experiment Dashboard
+            Negotiation Study Performance Dashboard
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Real-time evaluation of Run Time and Negotiation Accuracy conditioned on participant emotional valence.
+            Real-time measurement of Run Time, Negotiation Accuracy, Bot Rejections, and Target Point Attainment.
           </p>
         </div>
 
@@ -106,252 +105,139 @@ export default function ResearcherDashboard() {
         </div>
       </div>
 
-      {/* Main Condition Comparison Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {/* Pleasant Condition */}
-        <div className="bg-white border-2 border-emerald-200/80 rounded-xl p-5 shadow-xs relative overflow-hidden">
-          <div className="flex items-center justify-between pb-3 border-b border-emerald-100 mb-4">
-            <div>
-              <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-emerald-700">
-                Condition 1
-              </span>
-              <h3 className="text-base font-bold text-slate-900">Pleasant (Easy Bot)</h3>
-            </div>
-            <span className="text-xs font-mono px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold">
-              {pleasant.totalTrials || 0} trials
-            </span>
+      {/* Core Summary Metrics Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {/* Run Time */}
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
+          <div className="flex items-center justify-between text-slate-500 mb-2">
+            <span className="text-xs font-medium">Mean Run Time</span>
+            <Clock className="w-4 h-4 text-slate-400" />
           </div>
-
-          <div className="space-y-3 text-xs">
-            <div className="flex justify-between items-baseline">
-              <span className="text-slate-500">Average Run Time:</span>
-              <span className="font-mono text-base font-bold text-slate-900">
-                {pleasant.avgRunTimeSec || 0}s
-              </span>
-            </div>
-            <div className="flex justify-between items-baseline">
-              <span className="text-slate-500">Negotiation Accuracy:</span>
-              <span className="font-mono text-base font-bold text-emerald-700">
-                {pleasant.avgAccuracyPercent || 0}%
-              </span>
-            </div>
-            <div className="flex justify-between items-baseline">
-              <span className="text-slate-500">Deal Speed:</span>
-              <span className="font-mono text-xs font-semibold text-slate-800">
-                {pleasant.avgDealSpeedPointsPerSec || 0} pts/s
-              </span>
-            </div>
-            <div className="flex justify-between items-baseline">
-              <span className="text-slate-500">Target Reached Rate:</span>
-              <span className="font-mono text-xs font-semibold text-slate-800">
-                {pleasant.targetReachedRate || 0}%
-              </span>
-            </div>
+          <div className="text-2xl font-bold font-mono-num text-slate-900">
+            {overall.avgRunTimeSec || 0}s
+          </div>
+          <div className="text-[11px] text-slate-400 mt-1">
+            Time per round to reach agreement
           </div>
         </div>
 
-        {/* Neutral Condition */}
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs relative">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-            <div>
-              <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-slate-500">
-                Condition 2
-              </span>
-              <h3 className="text-base font-bold text-slate-900">Neutral (Moderate Bot)</h3>
-            </div>
-            <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 font-semibold">
-              {neutral.totalTrials || 0} trials
-            </span>
+        {/* Negotiation Accuracy */}
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
+          <div className="flex items-center justify-between text-slate-500 mb-2">
+            <span className="text-xs font-medium">Negotiation Accuracy</span>
+            <Target className="w-4 h-4 text-emerald-600" />
           </div>
-
-          <div className="space-y-3 text-xs">
-            <div className="flex justify-between items-baseline">
-              <span className="text-slate-500">Average Run Time:</span>
-              <span className="font-mono text-base font-bold text-slate-900">
-                {neutral.avgRunTimeSec || 0}s
-              </span>
-            </div>
-            <div className="flex justify-between items-baseline">
-              <span className="text-slate-500">Negotiation Accuracy:</span>
-              <span className="font-mono text-base font-bold text-slate-700">
-                {neutral.avgAccuracyPercent || 0}%
-              </span>
-            </div>
-            <div className="flex justify-between items-baseline">
-              <span className="text-slate-500">Deal Speed:</span>
-              <span className="font-mono text-xs font-semibold text-slate-800">
-                {neutral.avgDealSpeedPointsPerSec || 0} pts/s
-              </span>
-            </div>
-            <div className="flex justify-between items-baseline">
-              <span className="text-slate-500">Target Reached Rate:</span>
-              <span className="font-mono text-xs font-semibold text-slate-800">
-                {neutral.targetReachedRate || 0}%
-              </span>
-            </div>
+          <div className="text-2xl font-bold font-mono-num text-emerald-700">
+            {overall.avgAccuracyPercent || 0}%
+          </div>
+          <div className="text-[11px] text-slate-400 mt-1">
+            Pareto frontier efficiency
           </div>
         </div>
 
-        {/* Unpleasant Condition */}
-        <div className="bg-white border-2 border-rose-200/80 rounded-xl p-5 shadow-xs relative overflow-hidden">
-          <div className="flex items-center justify-between pb-3 border-b border-rose-100 mb-4">
-            <div>
-              <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-rose-700">
-                Condition 3
-              </span>
-              <h3 className="text-base font-bold text-slate-900">Unpleasant (Hard Bot)</h3>
-            </div>
-            <span className="text-xs font-mono px-2 py-0.5 rounded bg-rose-50 text-rose-800 border border-rose-200 font-semibold">
-              {unpleasant.totalTrials || 0} trials
-            </span>
+        {/* Deal Speed */}
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
+          <div className="flex items-center justify-between text-slate-500 mb-2">
+            <span className="text-xs font-medium">Deal Speed</span>
+            <Zap className="w-4 h-4 text-amber-500" />
           </div>
+          <div className="text-2xl font-bold font-mono-num text-slate-900">
+            {overall.avgDealSpeedPointsPerSec || 0}
+          </div>
+          <div className="text-[11px] text-slate-400 mt-1">
+            Points earned per second
+          </div>
+        </div>
 
-          <div className="space-y-3 text-xs">
-            <div className="flex justify-between items-baseline">
-              <span className="text-slate-500">Average Run Time:</span>
-              <span className="font-mono text-base font-bold text-slate-900">
-                {unpleasant.avgRunTimeSec || 0}s
-              </span>
-            </div>
-            <div className="flex justify-between items-baseline">
-              <span className="text-slate-500">Negotiation Accuracy:</span>
-              <span className="font-mono text-base font-bold text-rose-700">
-                {unpleasant.avgAccuracyPercent || 0}%
-              </span>
-            </div>
-            <div className="flex justify-between items-baseline">
-              <span className="text-slate-500">Deal Speed:</span>
-              <span className="font-mono text-xs font-semibold text-slate-800">
-                {unpleasant.avgDealSpeedPointsPerSec || 0} pts/s
-              </span>
-            </div>
-            <div className="flex justify-between items-baseline">
-              <span className="text-slate-500">Target Reached Rate:</span>
-              <span className="font-mono text-xs font-semibold text-slate-800">
-                {unpleasant.targetReachedRate || 0}%
-              </span>
-            </div>
+        {/* Target Reached Rate */}
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
+          <div className="flex items-center justify-between text-slate-500 mb-2">
+            <span className="text-xs font-medium">Target Attainment</span>
+            <CheckCircle2 className="w-4 h-4 text-blue-600" />
+          </div>
+          <div className="text-2xl font-bold font-mono-num text-blue-700">
+            {overall.targetReachedRate || 0}%
+          </div>
+          <div className="text-[11px] text-slate-400 mt-1">
+            Sessions reaching 500+ pts
           </div>
         </div>
       </div>
 
-      {/* Comparative Charts: Run Time & Accuracy */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Chart 1: Mean Run Time by Condition */}
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-slate-500" />
-              <h4 className="text-sm font-bold text-slate-900">
-                Mean Negotiation Run Time (Seconds)
-              </h4>
-            </div>
-            <span className="text-[11px] font-mono text-slate-400">Lower = Faster Deals</span>
+      {/* Rejection Rule Banner & Stats */}
+      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-lg bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 shrink-0">
+            <XCircle className="w-5 h-5" />
           </div>
-
-          {/* Bar Chart Visualization */}
-          <div className="space-y-4 pt-2">
-            {/* Pleasant */}
-            <div>
-              <div className="flex justify-between text-xs mb-1 font-mono">
-                <span className="text-slate-700 font-semibold">Pleasant (Easy)</span>
-                <span className="text-slate-900 font-bold">{pleasant.avgRunTimeSec || 0}s</span>
-              </div>
-              <div className="h-4 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
-                <div
-                  className="h-full bg-emerald-500 transition-all duration-500"
-                  style={{ width: `${Math.min(100, ((pleasant.avgRunTimeSec || 0) / 40) * 100)}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Neutral */}
-            <div>
-              <div className="flex justify-between text-xs mb-1 font-mono">
-                <span className="text-slate-700 font-semibold">Neutral (Moderate)</span>
-                <span className="text-slate-900 font-bold">{neutral.avgRunTimeSec || 0}s</span>
-              </div>
-              <div className="h-4 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
-                <div
-                  className="h-full bg-amber-500 transition-all duration-500"
-                  style={{ width: `${Math.min(100, ((neutral.avgRunTimeSec || 0) / 40) * 100)}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Unpleasant */}
-            <div>
-              <div className="flex justify-between text-xs mb-1 font-mono">
-                <span className="text-slate-700 font-semibold">Unpleasant (Hard)</span>
-                <span className="text-slate-900 font-bold">{unpleasant.avgRunTimeSec || 0}s</span>
-              </div>
-              <div className="h-4 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
-                <div
-                  className="h-full bg-rose-500 transition-all duration-500"
-                  style={{ width: `${Math.min(100, ((unpleasant.avgRunTimeSec || 0) / 40) * 100)}%` }}
-                />
-              </div>
-            </div>
+          <div>
+            <h4 className="text-sm font-bold text-slate-900">
+              Bot Rejection Rule Enforcement
+            </h4>
+            <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
+              Demands exceeding the previous offer by <strong>10+ points</strong> OR <strong>15%+</strong> are systematically rejected by the bot without concession.
+            </p>
           </div>
         </div>
-
-        {/* Chart 2: Negotiation Accuracy by Condition */}
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Target className="w-4 h-4 text-slate-500" />
-              <h4 className="text-sm font-bold text-slate-900">
-                Negotiation Accuracy / Efficiency (%)
-              </h4>
-            </div>
-            <span className="text-[11px] font-mono text-slate-400">Higher = Closer to Optimal</span>
+        <div className="flex items-center gap-4 text-xs font-mono">
+          <div className="bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+            <span className="text-slate-500">Total Trials: </span>
+            <span className="font-bold text-slate-900">{summary?.totalTrialsCount || 0}</span>
           </div>
-
-          <div className="space-y-4 pt-2">
-            {/* Pleasant */}
-            <div>
-              <div className="flex justify-between text-xs mb-1 font-mono">
-                <span className="text-slate-700 font-semibold">Pleasant (Easy)</span>
-                <span className="text-slate-900 font-bold">{pleasant.avgAccuracyPercent || 0}%</span>
-              </div>
-              <div className="h-4 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
-                <div
-                  className="h-full bg-emerald-500 transition-all duration-500"
-                  style={{ width: `${pleasant.avgAccuracyPercent || 0}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Neutral */}
-            <div>
-              <div className="flex justify-between text-xs mb-1 font-mono">
-                <span className="text-slate-700 font-semibold">Neutral (Moderate)</span>
-                <span className="text-slate-900 font-bold">{neutral.avgAccuracyPercent || 0}%</span>
-              </div>
-              <div className="h-4 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
-                <div
-                  className="h-full bg-amber-500 transition-all duration-500"
-                  style={{ width: `${neutral.avgAccuracyPercent || 0}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Unpleasant */}
-            <div>
-              <div className="flex justify-between text-xs mb-1 font-mono">
-                <span className="text-slate-700 font-semibold">Unpleasant (Hard)</span>
-                <span className="text-slate-900 font-bold">{unpleasant.avgAccuracyPercent || 0}%</span>
-              </div>
-              <div className="h-4 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
-                <div
-                  className="h-full bg-rose-500 transition-all duration-500"
-                  style={{ width: `${unpleasant.avgAccuracyPercent || 0}%` }}
-                />
-              </div>
-            </div>
+          <div className="bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+            <span className="text-slate-500">Participants: </span>
+            <span className="font-bold text-slate-900">{summary?.totalSessionsCount || 0}</span>
           </div>
         </div>
       </div>
+
+      {/* Recent Trial Logs Table */}
+      {recentTrials.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs">
+          <h4 className="text-sm font-bold text-slate-900 mb-3 flex items-center justify-between">
+            <span>Recent Trial Telemetry Logs</span>
+            <span className="text-xs font-mono text-slate-400 font-normal">Last {recentTrials.length} recorded rounds</span>
+          </h4>
+          <div className="border border-slate-200 rounded-lg overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-mono">
+                <tr>
+                  <th className="py-2.5 px-3">Participant</th>
+                  <th className="py-2.5 px-3">Round</th>
+                  <th className="py-2.5 px-3">Outcome</th>
+                  <th className="py-2.5 px-3">Points</th>
+                  <th className="py-2.5 px-3">Run Time</th>
+                  <th className="py-2.5 px-3">Counters</th>
+                  <th className="py-2.5 px-3">Accuracy</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-mono">
+                {recentTrials.map((t, idx) => (
+                  <tr key={t._id || idx} className="hover:bg-slate-50/50">
+                    <td className="py-2 px-3 font-semibold text-slate-800">{t.participantId}</td>
+                    <td className="py-2 px-3 text-slate-600">Round {t.roundNumber}</td>
+                    <td className="py-2 px-3">
+                      <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
+                        t.finalOutcome === 'participant_accepted' || t.finalOutcome === 'bot_accepted_demand'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-rose-50 text-rose-700 border border-rose-200'
+                      }`}>
+                        {t.finalOutcome}
+                      </span>
+                    </td>
+                    <td className="py-2 px-3 font-bold text-slate-900">{t.agreedPoints}</td>
+                    <td className="py-2 px-3 text-slate-600">{(t.roundDurationMs / 1000).toFixed(1)}s</td>
+                    <td className="py-2 px-3 text-slate-600">{t.countersExchanged}</td>
+                    <td className="py-2 px-3 text-emerald-700 font-semibold">
+                      {Math.round((t.accuracyRatio || 0) * 100)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

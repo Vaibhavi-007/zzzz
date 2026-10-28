@@ -14,13 +14,11 @@ const sessionSchema = new mongoose.Schema({
   },
   condition: {
     type: String,
-    enum: ['pleasant', 'neutral', 'unpleasant'],
-    required: true
+    default: 'standard'
   },
   stimulusType: {
     type: String,
-    enum: ['video', 'photo'],
-    default: 'video'
+    default: 'none'
   },
   stimulusId: {
     type: String,
@@ -40,8 +38,7 @@ const sessionSchema = new mongoose.Schema({
   },
   reportedMood: {
     type: String,
-    enum: ['pleasant', 'neutral', 'unpleasant', 'pending'],
-    default: 'pending'
+    default: 'none'
   },
   likertValenceScore: {
     type: Number,

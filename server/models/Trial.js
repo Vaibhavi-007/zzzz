@@ -4,7 +4,7 @@ const exchangeSchema = new mongoose.Schema({
   turn: { type: Number, required: true },
   action: {
     type: String,
-    enum: ['initial_offer', 'participant_demand', 'bot_counter', 'bot_final_offer', 'deal_accepted', 'timeout'],
+    enum: ['initial_offer', 'participant_demand', 'bot_counter', 'bot_final_offer', 'bot_rejected', 'deal_accepted', 'timeout'],
     required: true
   },
   participantDemand: { type: Number },
@@ -31,17 +31,15 @@ const trialSchema = new mongoose.Schema({
   },
   condition: {
     type: String,
-    enum: ['pleasant', 'neutral', 'unpleasant'],
-    required: true
+    default: 'standard'
   },
   reportedMood: {
     type: String,
-    required: true
+    default: 'none'
   },
   botDifficulty: {
     type: String,
-    enum: ['easy', 'moderate', 'hard'],
-    required: true
+    default: 'standard'
   },
   poolSize: {
     type: Number,
@@ -62,7 +60,7 @@ const trialSchema = new mongoose.Schema({
   exchanges: [exchangeSchema],
   finalOutcome: {
     type: String,
-    enum: ['participant_accepted', 'bot_accepted_demand', 'timeout', 'walkaway'],
+    enum: ['participant_accepted', 'bot_accepted_demand', 'bot_rejected', 'timeout', 'walkaway'],
     required: true
   },
   agreedPoints: {

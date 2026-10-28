@@ -14,13 +14,11 @@ const participantSchema = new mongoose.Schema({
   },
   assignedCondition: {
     type: String,
-    enum: ['pleasant', 'neutral', 'unpleasant'],
-    required: true
+    default: 'standard'
   },
   stimulusType: {
     type: String,
-    enum: ['video', 'photo'],
-    default: 'video'
+    default: 'none'
   },
   status: {
     type: String,
