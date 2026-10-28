@@ -26,6 +26,7 @@ router.post('/start', async (req, res) => {
       sessionId,
       participantId: participantId.trim(),
       targetPoints: Number(targetPoints) || 500,
+      initialBotOffer: initialBotConfig.openOffer,
       totalPointsWon: 0,
       targetReached: false,
       totalRoundsPlayed: 0,
@@ -227,7 +228,9 @@ router.post('/:id/round', async (req, res) => {
       fallback.save('sessions', session);
     }
 
-    const nextBotConfig = getBotConfig();
+    // Ensure following round opening offer is never lower than initial round offer
+    const minOfferFloor = session.initialBotOffer || trialData.botOpeningOffer || 30;
+    const nextBotConfig = getBotConfig(minOfferFloor);
 
     res.json({
       success: true,

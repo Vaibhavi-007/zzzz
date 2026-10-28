@@ -44,15 +44,19 @@ export default function NegotiateWire({
   const roundStartTimeRef = useRef(Date.now());
   const offerShownTimeRef = useRef(performance.now());
   const firstActionTimeRef = useRef(null);
+  const initialBotOfferRef = useRef(null);
 
   // Sync state if round resets or initial botConfig loads
   useEffect(() => {
     if (botConfig) {
-      let roundOpenOffer = botConfig.openOffer;
-      if (roundNumber > 1 && !botConfig._freshRandom) {
-        const jitter = Math.floor(Math.random() * 7) - 3;
-        roundOpenOffer = Math.max(16, Math.min(60, (botConfig.openOffer || 32) + jitter));
+      // Record initial demand in Round 1
+      if (initialBotOfferRef.current === null && botConfig.openOffer) {
+        initialBotOfferRef.current = botConfig.openOffer;
       }
+
+      // Guarantee: In any following round, the bot's offer/demand is NEVER lower than its initial demand
+      const minFloor = initialBotOfferRef.current !== null ? initialBotOfferRef.current : 28;
+      const roundOpenOffer = Math.max(minFloor, botConfig.openOffer || minFloor);
 
       setBotOffer(roundOpenOffer);
       // Initialize participant demand comfortably close (+4 points) to avoid immediate accidental rejection

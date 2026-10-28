@@ -29,11 +29,20 @@ const BASE_CONFIG = {
 };
 
 /**
- * Returns a randomized bot configuration for a negotiation round
+ * Returns a randomized bot configuration for a negotiation round.
+ * If minAllowedOffer is provided (e.g. from initial round), the opening offer
+ * for any following round is guaranteed to be >= minAllowedOffer.
  */
-function getBotConfig() {
-  const openOffer = getRandomInt(BASE_CONFIG.openOfferMin, BASE_CONFIG.openOfferMax);
-  const botReservationLimit = getRandomInt(BASE_CONFIG.reservationLimitMin, BASE_CONFIG.reservationLimitMax);
+function getBotConfig(minAllowedOffer) {
+  const floor = minAllowedOffer ? Math.round(Number(minAllowedOffer)) : BASE_CONFIG.openOfferMin;
+  const minOffer = Math.max(floor, BASE_CONFIG.openOfferMin);
+  const maxOffer = Math.max(minOffer + 4, BASE_CONFIG.openOfferMax);
+
+  const openOffer = getRandomInt(minOffer, maxOffer);
+  const botReservationLimit = getRandomInt(
+    Math.max(openOffer + 15, BASE_CONFIG.reservationLimitMin),
+    Math.max(openOffer + 25, BASE_CONFIG.reservationLimitMax)
+  );
   const concessionStep = getRandomChoice(BASE_CONFIG.concessionSteps);
 
   return {

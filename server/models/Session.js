@@ -28,6 +28,10 @@ const sessionSchema = new mongoose.Schema({
     type: Number,
     default: 500
   },
+  initialBotOffer: {
+    type: Number,
+    default: null
+  },
   totalPointsWon: {
     type: Number,
     default: 0
