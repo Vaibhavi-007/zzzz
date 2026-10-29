@@ -103,13 +103,14 @@ function evaluateCounterDemand(demand, currentBotOffer, counterCount, activeRese
     }
 
     const dialogue = isFinal
-      ? `Offer Rejected! Your demand of ${numericDemand} points ${reasonText}. Maximum turns reached. Accept my standing offer of ${prevOffer} points or forfeit the round.`
-      : `Offer Rejected! Your demand of ${numericDemand} points ${reasonText}. I will not accept an increase of 10+ points or 15%+ over the previous offer. My offer stands at ${prevOffer} points.`;
+      ? `No. Offer rejected! Your demand of ${numericDemand} points ${reasonText}. Turn limit reached. Accept my standing offer of ${prevOffer} points or the round concludes without a deal.`
+      : `No. Offer rejected! Your demand of ${numericDemand} points ${reasonText}. I will not accept an increase of 10+ points or 15%+ over the previous offer. My standing offer remains ${prevOffer} points.`;
 
     return {
       action: 'bot_rejected',
       isDeal: false,
       isRejected: true,
+      botDecision: 'NO',
       botOffer: prevOffer, // Bot stands firm at current offer without conceding
       rejectionReason: reasonText,
       diff,
